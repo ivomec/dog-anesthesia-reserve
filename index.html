@@ -110,7 +110,7 @@
                 <!-- Liver Function -->
                 <div>
                     <label for="liver_status" class="block text-center text-lg font-semibold text-gray-700 mb-2">🌿 간 기능</label>
-                    <select id="liver_status" class="input-field !text-base" onchange="calculateAll()">
+                    <select id="liver_status" class="input-field !text-base" onchange="handleLiverStatusChange()">
                         <option value="normal" selected>정상</option>
                         <option value="mild">경미한 상승 (ALT/ALP < 2배)</option>
                         <option value="severe">심각한 상승 (ALT/ALP > 2배)</option>
