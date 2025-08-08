@@ -14,6 +14,21 @@ function openTab(evt, tabName) {
     evt.currentTarget.className += " active";
 }
 
+// --- 정보 동기화 함수 ---
+function syncPatientInfo() {
+    const patientName = document.getElementById('patientName').value;
+    const visitDate = document.getElementById('visitDate').value;
+    
+    // Sync to Education Tab
+    const eduPatientNameEl = document.getElementById('eduPatientName');
+    const attachDateEl = document.getElementById('attachDate');
+
+    if (eduPatientNameEl) eduPatientNameEl.value = patientName;
+    if (attachDateEl && !attachDateEl.value) attachDateEl.value = visitDate;
+
+    calculateRemovalDate();
+}
+
 // --- 메인 계산 함수 ---
 function calculateAll() {
     const weightInput = document.getElementById('weight');
@@ -115,7 +130,7 @@ function populateDischargeTab(weight) {
     document.getElementById('discharge_alt').innerHTML = `<h3 class="font-bold text-lg text-orange-700 mb-2 mt-6">🥈 시나리오 2: NSAID-Sparing</h3><div class="info-box mb-2 text-xs"><p>NSAIDs 금기 또는 위장관 부작용이 우려되는 환자에게 적용합니다.</p><p class="font-bold text-red-600">🚨 주의: 아세트아미노펜은 고양이에게 절대 금기!</p></div><div class="p-4 bg-orange-50 rounded-lg space-y-3"><p><strong>- 가바펜틴 (10mg/kg, BID):</strong></p><div class="text-sm p-2 bg-orange-100 rounded">${getPillCount(10*weight, 2, pillStrengths.gabapentin, generalDays)}</div><hr><p><strong>- 아세트아미노펜 (15mg/kg, BID):</strong></p><div class="text-sm p-2 bg-orange-100 rounded">${getPillCount(15*weight, 2, pillStrengths.acetaminophen, generalDays)}</div></div>`;
 }
 
-// --- 보호자 교육 및 저장 기능 ---
+// --- 기록/저장 및 이미지 출력 기능 ---
 function calculateRemovalDate() {
     const dateInput = document.getElementById('attachDate')?.value;
     const timeInput = document.getElementById('attachTime')?.value;
@@ -149,19 +164,16 @@ function saveAsImage() {
     });
 }
 
-// ★★★★★ 마취 준비 탭 이미지 저장 기능 ★★★★★
 function exportPrepSheetAsImage() {
     const captureElement = document.getElementById('prepTab');
     const weight = document.getElementById('weight').value || '체중미입력';
     const patientName = document.getElementById('patientName').value || '환자';
-    
-    // 파일명 생성 (예: 환자이름_4.5kg_마취준비시트.png)
     const filename = `${patientName}_${weight}kg_마취준비시트.png`;
     
     html2canvas(captureElement, {
         useCORS: true,
-        scale: 1.5, // 해상도를 높여서 선명한 이미지 생성
-        backgroundColor: '#f8f9fa' // body 배경색과 동일하게 설정
+        scale: 1.5,
+        backgroundColor: '#f8f9fa'
     }).then(canvas => {
         const link = document.createElement('a');
         link.download = filename;
@@ -170,23 +182,107 @@ function exportPrepSheetAsImage() {
     });
 }
 
+function savePatientInfoAsImage() {
+    const captureElement = document.getElementById('patientInfoCard');
+    const patientName = document.getElementById('patientName').value || '환자정보';
+    const visitDate = document.getElementById('visitDate').value || new Date().toISOString().slice(0, 10);
+
+    html2canvas(captureElement, {
+        useCORS: true,
+        scale: 2,
+        backgroundColor: '#f8f9fa'
+    }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `${visitDate}_${patientName}_환자정보.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+}
+
+function saveRecordToJSON() {
+    const patientName = document.getElementById('patientName').value || '환자';
+    const visitDate = document.getElementById('visitDate').value || new Date().toISOString().slice(0, 10);
+
+    const data = {
+        patientName: document.getElementById('patientName').value,
+        visitDate: document.getElementById('visitDate').value,
+        weight: document.getElementById('weight').value,
+        patient_status: document.getElementById('patient_status').value,
+        liver_status: document.getElementById('liver_status').value,
+        kidney_status: document.getElementById('kidney_status').value,
+        selectedTubeInfo: selectedTubeInfo,
+        prescription_days: document.getElementById('prescription_days').value,
+        vetrocam_days: document.getElementById('vetrocam_days')?.value || '3',
+        dog_block_sites: document.getElementById('dog_block_sites')?.value || '4',
+        lk_cri_rate_mcg: document.getElementById('lk_cri_rate_mcg')?.value || '25',
+        dobutamine_dose_select: document.getElementById('dobutamine_dose_select')?.value || '5',
+    };
+
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], {type: "application/json"});
+    const url = URL.createObjectURL(dataBlob);
+
+    const link = document.createElement('a');
+    link.download = `${visitDate}_${patientName}_마취기록.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+function loadRecordFromFile(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            document.getElementById('patientName').value = data.patientName || '';
+            document.getElementById('visitDate').value = data.visitDate || '';
+            document.getElementById('weight').value = data.weight || '';
+            document.getElementById('patient_status').value = data.patient_status || 'healthy';
+            document.getElementById('liver_status').value = data.liver_status || 'normal';
+            document.getElementById('kidney_status').value = data.kidney_status || 'normal';
+
+            if (data.selectedTubeInfo) {
+                selectedTubeInfo = data.selectedTubeInfo;
+                document.getElementById('selectedEtTubeSize').value = selectedTubeInfo.size || '';
+                document.getElementById('selectedEtTubeCuff').checked = selectedTubeInfo.cuff || false;
+                document.getElementById('selectedEtTubeNotes').value = selectedTubeInfo.notes || '';
+            }
+
+            document.getElementById('prescription_days').value = data.prescription_days || '7';
+            if (document.getElementById('vetrocam_days')) {
+               document.getElementById('vetrocam_days').value = data.vetrocam_days || '3';
+            }
+            if (document.getElementById('dog_block_sites')) {
+                document.getElementById('dog_block_sites').value = data.dog_block_sites || '4';
+            }
+             if (document.getElementById('lk_cri_rate_mcg')) {
+                document.getElementById('lk_cri_rate_mcg').value = data.lk_cri_rate_mcg || '25';
+            }
+             if (document.getElementById('dobutamine_dose_select')) {
+                document.getElementById('dobutamine_dose_select').value = data.dobutamine_dose_select || '5';
+            }
+            
+            syncPatientInfo();
+            calculateAll();
+            alert('기록을 성공적으로 불러왔습니다.');
+
+        } catch (error) {
+            console.error("Error parsing JSON file:", error);
+            alert('오류: 유효하지 않은 파일 형식입니다.');
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+}
+
+
 // --- ET Tube 계산기 및 기록 관련 함수 ---
-const weightSizeGuide = [
-    { weight: 1, size: '3.0' }, { weight: 2, size: '3.5' },
-    { weight: 3.5, size: '4.0' }, { weight: 4, size: '4.5' },
-    { weight: 6, size: '5.5' }, { weight: 8, size: '6.0' },
-    { weight: 9, size: '7.0' }, { weight: 12, size: '7.0' },
-    { weight: 14, size: '7.5' }, { weight: 20, size: '9.0' },
-    { weight: 30, size: '11.0' }, { weight: 40, size: '13.0' }
-];
-const tracheaSizeGuide = [
-    { diameter: 5.13, id: '2.5' }, { diameter: 5.88, id: '3.0' },
-    { diameter: 6.63, id: '3.5' }, { diameter: 7.50, id: '4.0' },
-    { diameter: 8.13, id: '4.5' }, { diameter: 8.38, id: '5.0' },
-    { diameter: 9.13, id: '5.5' }, { diameter: 10.00, id: '6.0' },
-    { diameter: 11.38, id: '6.5' }, { diameter: 11.63, id: '7.0' },
-    { diameter: 12.50, id: '7.5' }, { diameter: 13.38, id: '8.0' }
-];
+const weightSizeGuide = [ { weight: 1, size: '3.0' }, { weight: 2, size: '3.5' }, { weight: 3.5, size: '4.0' }, { weight: 4, size: '4.5' }, { weight: 6, size: '5.5' }, { weight: 8, size: '6.0' }, { weight: 9, size: '7.0' }, { weight: 12, size: '7.0' }, { weight: 14, size: '7.5' }, { weight: 20, size: '9.0' }, { weight: 30, size: '11.0' }, { weight: 40, size: '13.0' } ];
+const tracheaSizeGuide = [ { diameter: 5.13, id: '2.5' }, { diameter: 5.88, id: '3.0' }, { diameter: 6.63, id: '3.5' }, { diameter: 7.50, id: '4.0' }, { diameter: 8.13, id: '4.5' }, { diameter: 8.38, id: '5.0' }, { diameter: 9.13, id: '5.5' }, { diameter: 10.00, id: '6.0' }, { diameter: 11.38, id: '6.5' }, { diameter: 11.63, id: '7.0' }, { diameter: 12.50, id: '7.5' }, { diameter: 13.38, id: '8.0' } ];
 
 function calculateWeightSize() {
     const weightInput = document.getElementById('weight-input');
@@ -228,7 +324,6 @@ function calculateTracheaSize() {
     resultContainerTrachea.classList.remove('hidden');
 }
 
-// ★★★★★ ET Tube 선택 정보 저장 및 표시 함수 ★★★★★
 function saveAndDisplayTubeSelection() {
     const sizeInput = document.getElementById('selectedEtTubeSize');
     const cuffInput = document.getElementById('selectedEtTubeCuff');
@@ -282,27 +377,26 @@ function updateTubeDisplay() {
 
 // --- DOM 로드 후 실행 ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 모든 input, select에 대한 기본 이벤트 리스너
     document.querySelectorAll('input, select').forEach(el => {
         if(el.id !== 'weight-input' && el.id !== 'trachea-input' && !el.closest('#educationTab')) {
              el.addEventListener('input', calculateAll);
         }
     });
-    calculateAll();
+
+    const visitDateEl = document.getElementById('visitDate');
+    if (visitDateEl && !visitDateEl.value) {
+        visitDateEl.value = new Date().toISOString().slice(0, 10);
+    }
     
-    // 보호자 교육 탭 날짜/시간 기본값 설정
-    const attachDateEl = document.getElementById('attachDate');
-    if (attachDateEl) {
+    const attachTimeEl = document.getElementById('attachTime');
+    const attachDateEduEl = document.getElementById('attachDate');
+    if (attachTimeEl) {
         const now = new Date();
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
         const hh = String(now.getHours()).padStart(2, '0');
         const min = String(now.getMinutes()).padStart(2, '0');
-        document.getElementById('attachDate').value = `${yyyy}-${mm}-${dd}`;
-        document.getElementById('attachTime').value = `${hh}:${min}`;
-        calculateRemovalDate();
+        attachTimeEl.value = `${hh}:${min}`;
     }
+    syncPatientInfo();
 
     // --- ET Tube 계산기 및 기록 이벤트 리스너 ---
     const calculateWeightBtn = document.getElementById('calculate-weight-btn');
@@ -314,4 +408,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if(calculateTracheaBtn) calculateTracheaBtn.addEventListener('click', calculateTracheaSize);
     if(tracheaInputTube) tracheaInputTube.addEventListener('keydown', (event) => { if (event.key === 'Enter') calculateTracheaSize(); });
     if(saveTubeBtn) saveTubeBtn.addEventListener('click', saveAndDisplayTubeSelection);
+    
+    // --- 신규 버튼 이벤트 리스너 ---
+    const saveRecordBtn = document.getElementById('saveRecordBtn');
+    const loadRecordBtn = document.getElementById('loadRecordBtn');
+    const fileInput = document.getElementById('fileInput');
+    const saveInfoImageBtn = document.getElementById('saveInfoImageBtn');
+
+    if(saveRecordBtn) saveRecordBtn.addEventListener('click', saveRecordToJSON);
+    if(loadRecordBtn) loadRecordBtn.addEventListener('click', () => fileInput.click());
+    if(fileInput) fileInput.addEventListener('change', loadRecordFromFile);
+    if(saveInfoImageBtn) saveInfoImageBtn.addEventListener('click', savePatientInfoAsImage);
+    
+    calculateAll();
 });
