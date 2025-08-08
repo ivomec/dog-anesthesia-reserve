@@ -47,7 +47,7 @@
         .result-box-weight { background-color: #e0f2fe; border-left: 6px solid #0ea5e9; }
         .result-box-trachea { background-color: #dcfce7; border-left: 6px solid #22c55e; }
         .action-button {
-            font-bold py-3 px-6 rounded-lg text-lg transition-all duration-300 ease-in-out;
+            font-weight: bold; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-size: 1rem; transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 300ms;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
         .action-button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
@@ -72,17 +72,55 @@
             <p class="mt-2 text-lg text-gray-600">🏥 금호동물병원 실전 워크플로우 (Anes AI)</p>
         </header>
 
-        <div class="card p-6 md:p-8">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-center">
+        <div class="card p-6 md:p-8" id="patientInfoCard">
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap gap-3 justify-center mb-6 no-print">
+                <button id="saveRecordBtn" class="action-button bg-indigo-600 hover:bg-indigo-700 text-white flex items-center"><i class="fas fa-save mr-2"></i>기록 저장 (JSON)</button>
+                <button id="loadRecordBtn" class="action-button bg-gray-600 hover:bg-gray-700 text-white flex items-center"><i class="fas fa-folder-open mr-2"></i>기록 불러오기</button>
+                <input type="file" id="fileInput" class="hidden" accept=".json">
+                <button id="saveInfoImageBtn" class="action-button bg-teal-600 hover:bg-teal-700 text-white flex items-center"><i class="fas fa-camera mr-2"></i>정보 카드 이미지 저장</button>
+            </div>
+        
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6 items-center">
+                <!-- Patient Name -->
                 <div>
-                    <label for="weight" class="block text-center text-xl font-semibold text-gray-700 mb-2">⚖️ 환자 체중 (kg)</label>
-                    <input type="number" id="weight" placeholder="체중 입력" class="input-field" oninput="calculateAll()">
+                    <label for="patientName" class="block text-center text-lg font-semibold text-gray-700 mb-2">🐶 환자 이름</label>
+                    <input type="text" id="patientName" placeholder="이름 입력" class="input-field !text-xl" oninput="syncPatientInfo()">
                 </div>
+                <!-- Date -->
                 <div>
-                    <label for="patient_status" class="block text-center text-xl font-semibold text-gray-700 mb-2">❤️‍🩹 환자 상태</label>
-                    <select id="patient_status" class="input-field" onchange="calculateAll()">
+                    <label for="visitDate" class="block text-center text-lg font-semibold text-gray-700 mb-2">🗓️ 내원 날짜</label>
+                    <input type="date" id="visitDate" class="input-field !text-xl" oninput="syncPatientInfo()">
+                </div>
+                <!-- Weight -->
+                <div>
+                    <label for="weight" class="block text-center text-lg font-semibold text-gray-700 mb-2">⚖️ 환자 체중 (kg)</label>
+                    <input type="number" id="weight" placeholder="체중 입력" class="input-field !text-xl" oninput="calculateAll()">
+                </div>
+                <!-- Patient Status -->
+                <div>
+                    <label for="patient_status" class="block text-center text-lg font-semibold text-gray-700 mb-2">❤️‍🩹 환자 상태</label>
+                    <select id="patient_status" class="input-field !text-base" onchange="calculateAll()">
                         <option value="healthy" selected>튼튼! 건강한 환자 (ASA 1-2)</option>
                         <option value="cardiac">😥 심장 질환 의심/확진</option>
+                    </select>
+                </div>
+                <!-- Liver Function -->
+                <div>
+                    <label for="liver_status" class="block text-center text-lg font-semibold text-gray-700 mb-2">🌿 간 기능</label>
+                    <select id="liver_status" class="input-field !text-base">
+                        <option value="normal" selected>정상</option>
+                        <option value="mild">경미한 상승 (ALT/ALP < 2배)</option>
+                        <option value="severe">심각한 상승 (ALT/ALP > 2배)</option>
+                    </select>
+                </div>
+                <!-- Kidney Function -->
+                <div>
+                    <label for="kidney_status" class="block text-center text-lg font-semibold text-gray-700 mb-2">💧 신장 기능</label>
+                    <select id="kidney_status" class="input-field !text-base">
+                        <option value="normal" selected>정상</option>
+                        <option value="iris_1_2">IRIS Stage 1-2</option>
+                        <option value="iris_3_4">IRIS Stage 3-4</option>
                     </select>
                 </div>
             </div>
@@ -246,7 +284,22 @@
                 </div>
                 <div id="captureArea" class="bg-white rounded-xl shadow-lg p-6 sm:p-10 border border-gray-200">
                     <header class="text-center mb-10"><h1 class="text-3xl md:text-4xl font-bold text-blue-800">🏥 금호동물병원</h1><h2 class="text-xl md:text-2xl font-semibold text-gray-700 mt-3">💌 우리 아이를 위한 통증 관리 패치 안내문</h2></header>
-                    <div class="border-y border-gray-200 py-5 mb-10 space-y-4">...</div>
+                    <div class="border-y border-gray-200 py-5 mb-10 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-gray-800">환자 이름:</span>
+                            <input type="text" id="eduPatientName" value="댕댕이" class="text-right font-semibold text-gray-700 w-48 p-1 bg-gray-100 rounded">
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-gray-800">패치 부착일:</span>
+                            <input type="date" id="attachDate" class="text-right font-semibold text-gray-700 w-48 p-1 bg-gray-100 rounded">
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-gray-800">부착 시간:</span>
+                            <input type="time" id="attachTime" class="text-right font-semibold text-gray-700 w-48 p-1 bg-gray-100 rounded" oninput="calculateRemovalDate()">
+                        </div>
+                        <div id="removalInfo" class="text-right bg-yellow-100 p-3 rounded-lg border border-yellow-300 mt-2">
+                        </div>
+                    </div>
                     <p class="text-gray-700 text-base md:text-lg mb-10 text-center leading-relaxed">...</p>
                     <div class="bg-blue-50 border-l-4 border-blue-500 p-5 rounded-md mb-10"><h3 class="text-xl font-bold text-blue-900 mb-2">✅ 이 패치는 어떤 역할을 하나요?</h3><ul class="list-disc list-inside text-gray-700 space-y-2 text-base"><li>진통제가 서서히 방출되어, 아이가 통증 없이 편안하게 지낼 수 있도록 돕는 <strong>'지속형 진통 패치'</strong>입니다.</li><li>잦은 주사나 약 복용의 스트레스를 줄여주는 장점이 있습니다.</li></ul></div>
                     <div class="mb-10">
