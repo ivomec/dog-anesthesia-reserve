@@ -25,7 +25,6 @@ function syncPatientInfo() {
     if (eduPatientNameEl) eduPatientNameEl.value = patientName;
     if (attachDateEl && visitDate) {
         attachDateEl.value = visitDate;
-        // Also set the time if it's empty
         if (!attachTimeEl.value) {
             const now = new Date();
             const hh = String(now.getHours()).padStart(2, '0');
@@ -50,14 +49,13 @@ function calculateAll() {
             weightInputTube.value = '';
             calculateWeightSize();
         }
-        // Clear calculation-dependent fields but keep inputs
         document.getElementById('pre_op_drugs_result').innerHTML = '';
         document.getElementById('dog_nerve_block_result').innerHTML = '';
         document.getElementById('lk_cri_calc_result').innerHTML = '';
         document.getElementById('hypotension_protocol').innerHTML = '';
         document.getElementById('bradycardia_protocol').innerHTML = '';
         document.getElementById('cpa_protocol').innerHTML = '';
-        calculateDischargeMeds(); // 퇴원약 탭도 업데이트
+        calculateDischargeMeds();
         return;
     }
     
@@ -72,7 +70,7 @@ function calculateAll() {
     populatePrepTab(weight);
     populateEmergencyTab(weight);
     updatePatchRecommendation(weight);
-    calculateDischargeMeds(); // 퇴원약 계산 함수 호출
+    calculateDischargeMeds();
 }
 
 // --- 탭별 내용 채우기 ---
@@ -198,7 +196,6 @@ function saveRecordToJSON() {
     const patientName = document.getElementById('patientName').value || '환자';
     const visitDate = document.getElementById('visitDate').value || new Date().toISOString().slice(0, 10);
     
-    // **NEW**: Collect discharge medication data
     const dischargeMedications = [];
     document.querySelectorAll('#dischargeTab tbody tr').forEach(row => {
         const doseInput = row.querySelector('.dose');
@@ -211,23 +208,16 @@ function saveRecordToJSON() {
     });
 
     const data = {
-        // Patient Info
         patientName: document.getElementById('patientName').value,
         visitDate: document.getElementById('visitDate').value,
         weight: document.getElementById('weight').value,
         patient_status: document.getElementById('patient_status').value,
         liver_status: document.getElementById('liver_status').value,
         kidney_status: document.getElementById('kidney_status').value,
-        
-        // ET Tube Info
         selectedTubeInfo: selectedTubeInfo,
-
-        // Other settings
         dog_block_sites: document.getElementById('dog_block_sites')?.value,
         lk_cri_rate_mcg: document.getElementById('lk_cri_rate_mcg')?.value,
         dobutamine_dose_select: document.getElementById('dobutamine_dose_select')?.value,
-
-        // **NEW**: Discharge Meds
         dischargeMedications: dischargeMedications
     };
 
@@ -251,7 +241,6 @@ function loadRecordFromFile(event) {
         try {
             const data = JSON.parse(e.target.result);
 
-            // Load Patient Info
             document.getElementById('patientName').value = data.patientName || '';
             document.getElementById('visitDate').value = data.visitDate || '';
             document.getElementById('weight').value = data.weight || '';
@@ -259,7 +248,6 @@ function loadRecordFromFile(event) {
             document.getElementById('liver_status').value = data.liver_status || 'normal';
             document.getElementById('kidney_status').value = data.kidney_status || 'normal';
 
-            // Load ET Tube Info
             if (data.selectedTubeInfo) {
                 selectedTubeInfo = data.selectedTubeInfo;
                 document.getElementById('selectedEtTubeSize').value = selectedTubeInfo.size || '';
@@ -267,7 +255,6 @@ function loadRecordFromFile(event) {
                 document.getElementById('selectedEtTubeNotes').value = selectedTubeInfo.notes || '';
             }
 
-            // Load Other Settings
             if (document.getElementById('dog_block_sites') && data.dog_block_sites) {
                 document.getElementById('dog_block_sites').value = data.dog_block_sites;
             }
@@ -278,9 +265,7 @@ function loadRecordFromFile(event) {
                 document.getElementById('dobutamine_dose_select').value = data.dobutamine_dose_select;
             }
 
-            // **NEW**: Load Discharge Medication Data
             if (data.dischargeMedications && Array.isArray(data.dischargeMedications)) {
-                // First, reset the state by unchecking all
                 document.querySelectorAll('#dischargeTab .med-checkbox').forEach(cb => cb.checked = false);
             
                 data.dischargeMedications.forEach(savedMed => {
@@ -296,7 +281,6 @@ function loadRecordFromFile(event) {
                 });
             }
             
-            // Sync and Recalculate everything
             syncPatientInfo();
             calculateAll();
             alert('기록을 성공적으로 불러왔습니다.');
@@ -307,7 +291,7 @@ function loadRecordFromFile(event) {
         }
     };
     reader.readAsText(file);
-    event.target.value = ''; // Reset file input
+    event.target.value = '';
 }
 
 
@@ -410,13 +394,46 @@ function updateTubeDisplay() {
 
 
 // --- START: 퇴원약 조제 탭 스크립트 ---
+function applyInitialDischargeDefaults() {
+    const defaultMeds7Days = ['clindamycin', 'gabapentin', 'famotidine', 'almagel'];
+    const defaultMeds3Days = ['vetrocam', 'acetaminophen', 'misoprostol'];
+
+    defaultMeds7Days.forEach(drugName => {
+        const row = document.querySelector(`#dischargeTab tr[data-drug="${drugName}"]`);
+        if (row) {
+            row.querySelector('.med-checkbox').checked = true;
+            row.querySelector('.days').value = 7;
+        }
+    });
+
+    defaultMeds3Days.forEach(drugName => {
+        const row = document.querySelector(`#dischargeTab tr[data-drug="${drugName}"]`);
+        if (row) {
+            row.querySelector('.med-checkbox').checked = true;
+            row.querySelector('.days').value = 3;
+        }
+    });
+}
+
+function handleLiverStatusChange() {
+    const liverStatus = document.getElementById('liver_status').value;
+    if (liverStatus !== 'normal') {
+        const sameRow = document.querySelector('#dischargeTab tr[data-drug="same"]');
+        if (sameRow) {
+            sameRow.querySelector('.med-checkbox').checked = true;
+            sameRow.querySelector('.days').value = 7;
+        }
+    }
+    calculateAll();
+}
+
 function initializeDischargeTab() {
+    applyInitialDischargeDefaults();
     const dischargeInputs = document.querySelectorAll('#dischargeTab .med-checkbox, #dischargeTab .days, #dischargeTab .dose');
     dischargeInputs.forEach(input => {
         input.addEventListener('change', calculateDischargeMeds);
         input.addEventListener('keyup', calculateDischargeMeds);
     });
-
     calculateDischargeMeds();
 }
 
@@ -562,7 +579,6 @@ function updateDischargeWarnings() {
 
 // --- DOM 로드 후 실행 ---
 document.addEventListener('DOMContentLoaded', () => {
-    // 모든 input, select에 대한 기본 이벤트 리스너
     document.querySelectorAll('input[oninput="calculateAll()"], select[onchange="calculateAll()"]').forEach(el => {
          el.addEventListener('input', calculateAll);
     });
@@ -574,7 +590,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     syncPatientInfo();
 
-    // ET Tube 계산기 및 기록 이벤트 리스너
     const calculateWeightBtn = document.getElementById('calculate-weight-btn');
     const tracheaInputTube = document.getElementById('trachea-input');
     const calculateTracheaBtn = document.getElementById('calculate-trachea-btn');
@@ -585,7 +600,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(tracheaInputTube) tracheaInputTube.addEventListener('keydown', (event) => { if (event.key === 'Enter') calculateTracheaSize(); });
     if(saveTubeBtn) saveTubeBtn.addEventListener('click', saveAndDisplayTubeSelection);
     
-    // 신규 버튼 이벤트 리스너
     const saveRecordBtn = document.getElementById('saveRecordBtn');
     const loadRecordBtn = document.getElementById('loadRecordBtn');
     const fileInput = document.getElementById('fileInput');
@@ -596,7 +610,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(fileInput) fileInput.addEventListener('change', loadRecordFromFile);
     if(saveInfoImageBtn) saveInfoImageBtn.addEventListener('click', savePatientInfoAsImage);
     
-    // 초기화 함수 호출
-    initializeDischargeTab(); // 퇴원약 탭 초기화
-    calculateAll(); // 전체 계산 실행
+    initializeDischargeTab();
+    calculateAll();
 });
